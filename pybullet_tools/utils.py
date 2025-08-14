@@ -19,6 +19,7 @@ import cProfile
 import pstats
 
 from collections import defaultdict, deque, namedtuple, OrderedDict
+from typing import Any, Dict, Iterable, Iterator, Optional, Sequence, Tuple
 try:
     from collections import MutableSet
 except ImportError:
@@ -31,9 +32,11 @@ from pybullet_utils.transformations import quaternion_from_matrix, unit_vector, 
     random_quaternion, quaternion_about_axis
 
 def join_paths(*paths):
+    """Return an absolute path formed by joining all given path components."""
     return os.path.abspath(os.path.join(*paths))
 
 def get_parent_dir(file): # __file__
+    """Return the directory containing the given file path."""
     return os.path.abspath(os.path.dirname(file))
 
 sys.path.extend([
@@ -118,13 +121,14 @@ SEPARATOR = '\n' + 50*'-' + '\n'
 
 inf_generator = count # count | lambda: iter(int, 1)
 
-List = lambda *args: list(args)
-Tuple = lambda *args: tuple(args)
 
-def empty_sequence():
+
+def empty_sequence() -> Iterator[Any]:
+    """Return an iterator that yields no elements."""
     return iter([])
 
-def irange(start, end=None, step=1):
+def irange(start: int, end: Optional[int] = None, step: int = 1) -> Iterator[int]:
+    """Yield a range of integers from start to end by a given step."""
     if end is None:
         end = start
         start = 0
@@ -133,7 +137,8 @@ def irange(start, end=None, step=1):
         yield n
         n += step
 
-def count_until(max_iterations=INF, max_time=INF):
+def count_until(max_iterations: float = INF, max_time: float = INF) -> Iterator[int]:
+    """Yield iteration counts until reaching max iterations or time."""
     start_time = time.time()
     assert (max_iterations < INF) or (max_time < INF)
     for iteration in irange(max_iterations):
@@ -141,28 +146,35 @@ def count_until(max_iterations=INF, max_time=INF):
             break
         yield iteration
 
-def print_separator(n=50):
+def print_separator(n: int = 50) -> None:
+    """Print a visual separator comprised of dashes."""
     print('\n' + n*'-' + '\n')
 
-def is_remote():
+def is_remote() -> bool:
+    """Check whether the current session is running remotely via SSH."""
     return 'SSH_CONNECTION' in os.environ
 
 def is_darwin(): # TODO: change loading accordingly
+    """Check whether the operating system is macOS."""
     return platform.system() == 'Darwin' # platform.release()
     #return sys.platform == 'darwin'
 
-def get_python_version():
+def get_python_version() -> int:
+    """Return the major version of the running Python interpreter."""
     return sys.version_info[0]
 
-def read(filename):
+def read(filename: str) -> str:
+    """Read and return the contents of a text file."""
     with open(filename, 'r') as f:
         return f.read()
 
-def write(filename, string):
+def write(filename: str, string: str) -> None:
+    """Write a string to a file, overwriting existing content."""
     with open(filename, 'w') as f:
         f.write(string)
 
-def read_pickle(filename):
+def read_pickle(filename: str) -> Any:
+    """Load a Python object from a pickle file."""
     # Can sometimes read pickle3 from python2 by calling twice
     with open(filename, 'rb') as f:
         try:
@@ -170,52 +182,63 @@ def read_pickle(filename):
         except UnicodeDecodeError as e:
             return pickle.load(f, encoding='latin1')
 
-def write_pickle(filename, data):  # NOTE - cannot pickle lambda or nested functions
+def write_pickle(filename: str, data: Any) -> None:  # NOTE - cannot pickle lambda or nested functions
+    """Write a Python object to a pickle file."""
     with open(filename, 'wb') as f:
         pickle.dump(data, f)
 
-def read_json(path):
+def read_json(path: str) -> Any:
+    """Read JSON data from a file."""
     return json.loads(read(path))
 
-def write_json(path, data):
+def write_json(path: str, data: Any) -> None:
+    """Write JSON data to a file."""
     with open(path, 'w') as f:
         json.dump(data, f, indent=2, sort_keys=True)
 
-def safe_remove(path):
+def safe_remove(path: str) -> None:
+    """Remove a file or directory if it exists."""
     if os.path.exists(path):
         if os.path.isdir(path):
             shutil.rmtree(path)
         else:
             os.remove(path)
 
-def ensure_dir(f):
+def ensure_dir(f: str) -> str:
+    """Ensure that the directory for a given file path exists."""
     d = os.path.dirname(f)
     if not os.path.exists(d):
         os.makedirs(d)
     return d
 
-def list_paths(directory):
+def list_paths(directory: str) -> list[str]:
+    """Return a sorted list of absolute paths for files in a directory."""
     return sorted(join_paths(directory, filename) for filename in os.listdir(directory))
 
 ##################################################
 
-def dict_from_kwargs(**kwargs):
+def dict_from_kwargs(**kwargs: Any) -> Dict[str, Any]:
+    """Return the provided keyword arguments as a dictionary."""
     return kwargs
 
-def unzip(sequence):
+def unzip(sequence: Iterable[Sequence[Any]]) -> Iterator[Tuple[Any, ...]]:
+    """Transpose a sequence of sequences similar to the built-in zip(*sequence)."""
     return zip(*sequence)
 
-def safe_zip(sequence1, sequence2): # TODO: *args
+def safe_zip(sequence1: Iterable[Any], sequence2: Iterable[Any]) -> list[Tuple[Any, Any]]: # TODO: *args
+    """Zip two sequences of equal length into a list of tuples."""
     sequence1, sequence2 = list(sequence1), list(sequence2)
     assert len(sequence1) == len(sequence2)
     return list(zip(sequence1, sequence2))
 
-def get_pairs(sequence):
+def get_pairs(sequence: Sequence[Any]) -> list[Tuple[Any, Any]]:
+    """Return consecutive element pairs from a sequence."""
     # TODO: lazy version
     sequence = list(sequence)
     return safe_zip(sequence[:-1], sequence[1:])
 
-def get_wrapped_pairs(sequence):
+def get_wrapped_pairs(sequence: Sequence[Any]) -> list[Tuple[Any, Any]]:
+    """Return consecutive element pairs with the sequence wrapped around."""
     # TODO: lazy version
     sequence = list(sequence)
     # zip(sequence, sequence[-1:] + sequence[:-1])
