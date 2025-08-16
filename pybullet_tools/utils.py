@@ -19,6 +19,7 @@ import cProfile
 import pstats
 
 from collections import defaultdict, deque, namedtuple, OrderedDict
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Set
 try:
     from collections import MutableSet
 except ImportError:
@@ -30,10 +31,16 @@ from contextlib import contextmanager
 from pybullet_utils.transformations import quaternion_from_matrix, unit_vector, euler_from_quaternion, quaternion_slerp, \
     random_quaternion, quaternion_about_axis
 
+Pose = Tuple[Tuple[float, float, float], Tuple[float, float, float, float]]
+BaseConf = Tuple[float, float, float]
+ConstraintId = int
+
 def join_paths(*paths):
+    """Return an absolute path formed by joining all given path components."""
     return os.path.abspath(os.path.join(*paths))
 
 def get_parent_dir(file): # __file__
+    """Return the directory containing the given file path."""
     return os.path.abspath(os.path.dirname(file))
 
 sys.path.extend([
@@ -118,13 +125,14 @@ SEPARATOR = '\n' + 50*'-' + '\n'
 
 inf_generator = count # count | lambda: iter(int, 1)
 
-List = lambda *args: list(args)
-Tuple = lambda *args: tuple(args)
 
-def empty_sequence():
+
+def empty_sequence() -> Iterator[Any]:
+    """Return an iterator that yields no elements."""
     return iter([])
 
-def irange(start, end=None, step=1):
+def irange(start: int, end: Optional[int] = None, step: int = 1) -> Iterator[int]:
+    """Yield a range of integers from start to end by a given step."""
     if end is None:
         end = start
         start = 0
@@ -133,7 +141,8 @@ def irange(start, end=None, step=1):
         yield n
         n += step
 
-def count_until(max_iterations=INF, max_time=INF):
+def count_until(max_iterations: float = INF, max_time: float = INF) -> Iterator[int]:
+    """Yield iteration counts until reaching max iterations or time."""
     start_time = time.time()
     assert (max_iterations < INF) or (max_time < INF)
     for iteration in irange(max_iterations):
@@ -141,28 +150,35 @@ def count_until(max_iterations=INF, max_time=INF):
             break
         yield iteration
 
-def print_separator(n=50):
+def print_separator(n: int = 50) -> None:
+    """Print a visual separator comprised of dashes."""
     print('\n' + n*'-' + '\n')
 
-def is_remote():
+def is_remote() -> bool:
+    """Check whether the current session is running remotely via SSH."""
     return 'SSH_CONNECTION' in os.environ
 
 def is_darwin(): # TODO: change loading accordingly
+    """Check whether the operating system is macOS."""
     return platform.system() == 'Darwin' # platform.release()
     #return sys.platform == 'darwin'
 
-def get_python_version():
+def get_python_version() -> int:
+    """Return the major version of the running Python interpreter."""
     return sys.version_info[0]
 
-def read(filename):
+def read(filename: str) -> str:
+    """Read and return the contents of a text file."""
     with open(filename, 'r') as f:
         return f.read()
 
-def write(filename, string):
+def write(filename: str, string: str) -> None:
+    """Write a string to a file, overwriting existing content."""
     with open(filename, 'w') as f:
         f.write(string)
 
-def read_pickle(filename):
+def read_pickle(filename: str) -> Any:
+    """Load a Python object from a pickle file."""
     # Can sometimes read pickle3 from python2 by calling twice
     with open(filename, 'rb') as f:
         try:
@@ -170,52 +186,63 @@ def read_pickle(filename):
         except UnicodeDecodeError as e:
             return pickle.load(f, encoding='latin1')
 
-def write_pickle(filename, data):  # NOTE - cannot pickle lambda or nested functions
+def write_pickle(filename: str, data: Any) -> None:  # NOTE - cannot pickle lambda or nested functions
+    """Write a Python object to a pickle file."""
     with open(filename, 'wb') as f:
         pickle.dump(data, f)
 
-def read_json(path):
+def read_json(path: str) -> Any:
+    """Read JSON data from a file."""
     return json.loads(read(path))
 
-def write_json(path, data):
+def write_json(path: str, data: Any) -> None:
+    """Write JSON data to a file."""
     with open(path, 'w') as f:
         json.dump(data, f, indent=2, sort_keys=True)
 
-def safe_remove(path):
+def safe_remove(path: str) -> None:
+    """Remove a file or directory if it exists."""
     if os.path.exists(path):
         if os.path.isdir(path):
             shutil.rmtree(path)
         else:
             os.remove(path)
 
-def ensure_dir(f):
+def ensure_dir(f: str) -> str:
+    """Ensure that the directory for a given file path exists."""
     d = os.path.dirname(f)
     if not os.path.exists(d):
         os.makedirs(d)
     return d
 
-def list_paths(directory):
+def list_paths(directory: str) -> list[str]:
+    """Return a sorted list of absolute paths for files in a directory."""
     return sorted(join_paths(directory, filename) for filename in os.listdir(directory))
 
 ##################################################
 
-def dict_from_kwargs(**kwargs):
+def dict_from_kwargs(**kwargs: Any) -> Dict[str, Any]:
+    """Return the provided keyword arguments as a dictionary."""
     return kwargs
 
-def unzip(sequence):
+def unzip(sequence: Iterable[Sequence[Any]]) -> Iterator[Tuple[Any, ...]]:
+    """Transpose a sequence of sequences similar to the built-in zip(*sequence)."""
     return zip(*sequence)
 
-def safe_zip(sequence1, sequence2): # TODO: *args
+def safe_zip(sequence1: Iterable[Any], sequence2: Iterable[Any]) -> list[Tuple[Any, Any]]: # TODO: *args
+    """Zip two sequences of equal length into a list of tuples."""
     sequence1, sequence2 = list(sequence1), list(sequence2)
     assert len(sequence1) == len(sequence2)
     return list(zip(sequence1, sequence2))
 
-def get_pairs(sequence):
+def get_pairs(sequence: Sequence[Any]) -> list[Tuple[Any, Any]]:
+    """Return consecutive element pairs from a sequence."""
     # TODO: lazy version
     sequence = list(sequence)
     return safe_zip(sequence[:-1], sequence[1:])
 
-def get_wrapped_pairs(sequence):
+def get_wrapped_pairs(sequence: Sequence[Any]) -> list[Tuple[Any, Any]]:
+    """Return consecutive element pairs with the sequence wrapped around."""
     # TODO: lazy version
     sequence = list(sequence)
     # zip(sequence, sequence[-1:] + sequence[:-1])
@@ -4430,7 +4457,18 @@ def sample_placement(top_body, bottom_body, bottom_link=None, **kwargs):
 
 # Reachability
 
-def sample_reachable_base(robot, point, reachable_range=(0.25, 1.0)):
+def sample_reachable_base(robot: int, point: Tuple[float, float, float],
+                          reachable_range: Tuple[float, float] = (0.25, 1.0)) -> BaseConf:
+    """Sample a base configuration within a radial range of a point.
+
+    Args:
+        robot: Body ID of the robot.
+        point: Target world point to sample around.
+        reachable_range: Minimum and maximum sampling radius.
+
+    Returns:
+        A sampled base configuration ``(x, y, yaw)``.
+    """
     radius = np.random.uniform(*reachable_range)
     x, y = radius*unit_from_theta(np.random.uniform(-np.pi, np.pi)) + point[:2]
     yaw = np.random.uniform(*CIRCULAR_LIMITS)
@@ -4438,7 +4476,8 @@ def sample_reachable_base(robot, point, reachable_range=(0.25, 1.0)):
     #set_base_values(robot, base_values)
     return base_values
 
-def uniform_pose_generator(robot, gripper_pose, **kwargs):
+def uniform_pose_generator(robot: int, gripper_pose: Pose, **kwargs: Any) -> Iterator[BaseConf]:
+    """Yield base configurations uniformly sampled around a gripper pose."""
     point = point_from_pose(gripper_pose)
     while True:
         base_values = sample_reachable_base(robot, point, **kwargs)
@@ -4448,7 +4487,9 @@ def uniform_pose_generator(robot, gripper_pose, **kwargs):
         #set_base_values(robot, base_values)
         #yield get_pose(robot)
 
-def custom_limits_from_base_limits(robot, base_limits, yaw_limit=None):
+def custom_limits_from_base_limits(robot: int, base_limits: Sequence[Tuple[float, float]],
+                                   yaw_limit: Optional[Tuple[float, float]] = None) -> Dict[int, Tuple[float, float]]:
+    """Convert planar base limits to joint-specific custom limits."""
     # TODO: unify with SS-Replan
     x_limits, y_limits = zip(*base_limits)
     custom_limits = {
@@ -4490,15 +4531,13 @@ sample_quaternion = random_quaternion
 
 # Constraints - applies forces when not satisfied
 
-def get_constraints():
-    """
-    getConstraintUniqueId will take a serial index in range 0..getNumConstraints,  and reports the constraint unique id.
-    Note that the constraint unique ids may not be contiguous, since you may remove constraints.
-    """
+def get_constraints() -> List[ConstraintId]:
+    """Return a list of all active constraint identifiers."""
     return [p.getConstraintUniqueId(i, physicsClientId=CLIENT)
             for i in range(p.getNumConstraints(physicsClientId=CLIENT))]
 
-def remove_constraint(constraint):
+def remove_constraint(constraint: ConstraintId) -> None:
+    """Remove the constraint identified by ``constraint``."""
     p.removeConstraint(constraint, physicsClientId=CLIENT)
 
 ConstraintInfo = namedtuple('ConstraintInfo', ['parentBodyUniqueId', 'parentJointIndex',
@@ -4506,19 +4545,23 @@ ConstraintInfo = namedtuple('ConstraintInfo', ['parentBodyUniqueId', 'parentJoin
                                                'jointAxis', 'jointPivotInParent', 'jointPivotInChild',
                                                'jointFrameOrientationParent', 'jointFrameOrientationChild', 'maxAppliedForce'])
 
-def get_constraint_info(constraint): # getConstraintState
+def get_constraint_info(constraint: ConstraintId) -> ConstraintInfo:  # getConstraintState
+    """Return Bullet constraint information for ``constraint``."""
     # TODO: four additional arguments
     return ConstraintInfo(*p.getConstraintInfo(constraint, physicsClientId=CLIENT)[:11])
 
-def get_fixed_constraints():
-    fixed_constraints = []
+def get_fixed_constraints() -> List[ConstraintId]:
+    """Return identifiers for all fixed (JOINT_FIXED) constraints."""
+    fixed_constraints: List[ConstraintId] = []
     for constraint in get_constraints():
         constraint_info = get_constraint_info(constraint)
         if constraint_info.constraintType == p.JOINT_FIXED:
             fixed_constraints.append(constraint)
     return fixed_constraints
 
-def add_pose_constraint(body, pose=None, max_force=None):
+def add_pose_constraint(body: int, pose: Optional[Pose] = None,
+                        max_force: Optional[float] = None) -> ConstraintId:
+    """Constrain a body at a fixed pose using a joint constraint."""
     link = BASE_LINK
     if pose is None:
         pose = get_pose(body)
@@ -4535,7 +4578,9 @@ def add_pose_constraint(body, pose=None, max_force=None):
         p.changeConstraint(constraint, maxForce=max_force, physicsClientId=CLIENT)
     return constraint
 
-def add_fixed_constraint(body, robot, robot_link=BASE_LINK, max_force=None):
+def add_fixed_constraint(body: int, robot: int, robot_link: int = BASE_LINK,
+                         max_force: Optional[float] = None) -> ConstraintId:
+    """Create a fixed constraint between a body and a robot link."""
     body_link = BASE_LINK
     body_pose = get_pose(body)
     #body_pose = get_com_pose(body, link=body_link)
@@ -4562,7 +4607,8 @@ def add_fixed_constraint(body, robot, robot_link=BASE_LINK, max_force=None):
         p.changeConstraint(constraint, maxForce=max_force, physicsClientId=CLIENT)
     return constraint
 
-def remove_fixed_constraint(body, robot, robot_link):
+def remove_fixed_constraint(body: int, robot: int, robot_link: int) -> None:
+    """Remove a previously created fixed constraint."""
     for constraint in get_fixed_constraints():
         constraint_info = get_constraint_info(constraint)
         if (body == constraint_info.childBodyUniqueId) and \
@@ -4578,60 +4624,67 @@ def remove_fixed_constraint(body, robot, robot_link):
 GraspInfo = namedtuple('GraspInfo', ['get_grasps', 'approach_pose'])
 
 class Attachment(object):
-    def __init__(self, parent, parent_link, grasp_pose, child):
-        self.parent = parent # TODO: support no parent
+    """Represents a fixed grasp attachment between a robot link and a body."""
+
+    def __init__(self, parent: int, parent_link: int, grasp_pose: Pose, child: int) -> None:
+        self.parent = parent  # TODO: support no parent
         self.parent_link = parent_link
         self.grasp_pose = grasp_pose
         self.child = child
         #self.child_link = child_link # child_link=BASE_LINK
+
     @property
-    def bodies(self):
-        return flatten_links(self.child) | flatten_links(self.parent, get_link_subtree(
-            self.parent, self.parent_link))
-    def assign(self):
+    def bodies(self) -> Set[CollisionPair]:
+        """Collision pairs affected by this attachment."""
+        return flatten_links(self.child) | flatten_links(
+            self.parent, get_link_subtree(self.parent, self.parent_link))
+
+    def assign(self) -> Pose:
+        """Apply the attachment and return the child's pose."""
         parent_link_pose = get_link_pose(self.parent, self.parent_link)
         child_pose = body_from_end_effector(parent_link_pose, self.grasp_pose)
         set_pose(self.child, child_pose)
         return child_pose
-    def apply_mapping(self, mapping):
+
+    def apply_mapping(self, mapping: Dict[int, int]) -> None:
+        """Remap body identifiers according to ``mapping``."""
         self.parent = mapping.get(self.parent, self.parent)
         self.child = mapping.get(self.child, self.child)
-    def __repr__(self):
+
+    def __repr__(self) -> str:
         return '{}({},{})'.format(self.__class__.__name__, self.parent, self.child)
 
-def create_attachment(parent, parent_link, child):
+def create_attachment(parent: int, parent_link: int, child: int) -> Attachment:
+    """Create an :class:`Attachment` from a parent link to a child body."""
     parent_link_pose = get_link_pose(parent, parent_link)
     child_pose = get_pose(child)
     grasp_pose = multiply(invert(parent_link_pose), child_pose)
     return Attachment(parent, parent_link, grasp_pose, child)
 
-def body_from_end_effector(end_effector_pose, grasp_pose):
-    """
-    world_from_parent * parent_from_child = world_from_child
-    """
+def body_from_end_effector(end_effector_pose: Pose, grasp_pose: Pose) -> Pose:
+    """Compute the body's world pose from an end effector pose and grasp offset."""
+    # world_from_parent * parent_from_child = world_from_child
     return multiply(end_effector_pose, grasp_pose)
 
-def end_effector_from_body(body_pose, grasp_pose):
-    """
-    grasp_pose: the body's pose in gripper's frame
-
-    world_from_child * (parent_from_child)^(-1) = world_from_parent
-    (parent: gripper, child: body to be grasped)
-
-    Pose_{world,gripper} = Pose_{world,block}*Pose_{block,gripper}
-                         = Pose_{world,block}*(Pose_{gripper,block})^{-1}
-    """
+def end_effector_from_body(body_pose: Pose, grasp_pose: Pose) -> Pose:
+    """Compute the gripper pose from a body pose and grasp offset."""
+    # grasp_pose: the body's pose in gripper's frame
+    #
+    # world_from_child * (parent_from_child)^(-1) = world_from_parent
+    # (parent: gripper, child: body to be grasped)
+    #
+    # Pose_{world,gripper} = Pose_{world,block}*Pose_{block,gripper}
+    #                      = Pose_{world,block}*(Pose_{gripper,block})^{-1}
     return multiply(body_pose, invert(grasp_pose))
 
-def approach_from_grasp(approach_pose, end_effector_pose):
+def approach_from_grasp(approach_pose: Pose, end_effector_pose: Pose) -> Pose:
+    """Compose an approach pose with an end effector pose."""
     return multiply(approach_pose, end_effector_pose)
 
-def get_grasp_pose(constraint):
-    """
-    Grasps are parent_from_child
-    """
+def get_grasp_pose(constraint: ConstraintId) -> Pose:
+    """Extract the grasp pose encoded in a fixed constraint."""
     constraint_info = get_constraint_info(constraint)
-    assert(constraint_info.constraintType == p.JOINT_FIXED)
+    assert (constraint_info.constraintType == p.JOINT_FIXED)
     joint_from_parent = (constraint_info.jointPivotInParent, constraint_info.jointFrameOrientationParent)
     joint_from_child = (constraint_info.jointPivotInChild, constraint_info.jointFrameOrientationChild)
     return multiply(invert(joint_from_parent), joint_from_child)
